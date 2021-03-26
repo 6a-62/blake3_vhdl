@@ -53,8 +53,6 @@ architecture behav of blake3 is
   
   -- 16-word internal state
   signal r_v : t_w32_vec(15 downto 0)  := (others => (others => '0'));
-  -- Compression function (g) operation counter
-  signal r_gops : integer range 0 to 7  := 0;
   -- Compression round counter
   signal r_round : integer range 0 to 6 := 0;
   
@@ -68,12 +66,105 @@ architecture behav of blake3 is
   signal r_mblock     : unsigned(511 downto 0);
   signal r_mblock_buf : unsigned(511 downto 0);
     
+  impure function f_A1(
+    v_A : in integer;
+    v_B : in integer;
+    v_M : in integer)
+    return unsigned is variable v_OUT : unsigned(31 downto 0);
+  begin
+    v_OUT := r_v(v_A) + r_v(v_B) + r_mblock((32*v_M)-1 downto (v_M-1)*32);
+    return v_OUT;
+  end;
+  
+  impure function f_D1(
+    v_A : in integer;
+    v_B : in integer;
+    v_D : in integer;
+    v_M : in integer)
+    return unsigned is variable v_OUT : unsigned(31 downto 0);
+  begin
+    v_OUT := (r_v(v_D) xor f_A1(v_A, v_B, v_M)) ror 16;
+    return v_OUT;
+  end;
+  
+  impure function f_C1(
+    v_A : in integer;
+    v_B : in integer;
+    v_C : in integer;
+    v_D : in integer;
+    v_M : in integer)
+    return unsigned is variable v_OUT : unsigned(31 downto 0);
+  begin
+    v_OUT := r_v(v_C) + f_D1(v_A, v_B, v_D, v_M);
+    return v_OUT;
+  end;
+  
+  impure function f_B1(
+    v_A : in integer;
+    v_B : in integer;
+    v_C : in integer;
+    v_D : in integer;
+    v_M : in integer)
+    return unsigned is variable v_OUT : unsigned(31 downto 0);
+  begin
+    v_OUT := (r_v(v_B) xor f_C1(v_A, v_B, v_C, v_D, v_M)) ror 12;
+    return v_OUT;
+  end;
+  
+  impure function f_A2(
+    v_A : in integer;
+    v_B : in integer;
+    v_C : in integer;
+    v_D : in integer;
+    v_M : in integer)
+    return unsigned is variable v_OUT : unsigned(31 downto 0);
+  begin
+    v_OUT := f_A1(v_A, v_B, v_M) + f_B1(v_A, v_B, v_C, v_D, v_M) + r_mblock((32*v_M)+31 downto (v_M)*32);
+    return v_OUT;
+  end;
+  
+  impure function f_D2(
+    v_A : in integer;
+    v_B : in integer;
+    v_C : in integer;
+    v_D : in integer;
+    v_M : in integer)
+    return unsigned is variable v_OUT : unsigned(31 downto 0);
+  begin
+    v_OUT := (f_D1(v_A, v_B, v_D, v_M) xor f_A2(v_A, v_B, v_C, v_D, v_M)) ror 8;
+    return v_OUT;
+  end;
+  
+  impure function f_C2(
+    v_A : in integer;
+    v_B : in integer;
+    v_C : in integer;
+    v_D : in integer;
+    v_M : in integer)
+    return unsigned is variable v_OUT : unsigned(31 downto 0);
+  begin
+    v_OUT := f_C1(v_A, v_B, v_C, v_D, v_M) + f_D2(v_A, v_B, v_C, v_D, v_M);
+    return v_OUT;
+  end;
+  
+  impure function f_B2(
+    v_A : in integer;
+    v_B : in integer;
+    v_C : in integer;
+    v_D : in integer;
+    v_M : in integer)
+    return unsigned is variable v_OUT : unsigned(31 downto 0);
+  begin
+    v_OUT := (f_B1(v_A, v_B, v_C, v_D, v_M) xor f_C2(v_A, v_B, v_C, v_D, v_M)) ror 7;
+    return v_OUT;
+  end;  
+  
 begin
 
   process (i_clk, i_reset)
   
   begin
-    if i_reset = '1' then
+    if i_reset = '0' then
       r_state <= STATE_IDLE;
       o_valid <= '0';
       o_hash <= (others => '0');
@@ -103,121 +194,74 @@ begin
           
           -- Reset counters
           r_round <= 0;
-          r_gops <= 0;
           -- Start compression
           r_state  <= STATE_GCOL;  
           
         when STATE_GCOL =>         
           -- Perform quarter-rounds on columns
-          -- Each quater-round in parallel, 8 operations each
-          case r_gops is
-            when 0 =>
-              -- Start of new round
-              r_v(0) <= r_v(0) + r_v(4) + r_mblock(31 downto 0);
-              r_v(1) <= r_v(1) + r_v(5) + r_mblock(95 downto 64);
-              r_v(2) <= r_v(2) + r_v(6) + r_mblock(159 downto 128);
-              r_v(3) <= r_v(3) + r_v(7) + r_mblock(223 downto 192);
-            when 1 =>
-              r_v(12) <= (r_v(12) xor r_v(0)) ror 16;
-              r_v(13) <= (r_v(13) xor r_v(1)) ror 16;
-              r_v(14) <= (r_v(14) xor r_v(2)) ror 16;
-              r_v(15) <= (r_v(15) xor r_v(3)) ror 16;
-            when 2 | 6 =>  
-              r_v(8)  <= r_v(8)  + r_v(12);
-              r_v(9)  <= r_v(9)  + r_v(13);
-              r_v(10) <= r_v(10) + r_v(14);
-              r_v(11) <= r_v(11) + r_v(15);
-            when 3 =>  
-              r_v(4) <= (r_v(4) xor r_v(8))  ror 12;
-              r_v(5) <= (r_v(5) xor r_v(9))  ror 12;
-              r_v(6) <= (r_v(6) xor r_v(10)) ror 12;
-              r_v(7) <= (r_v(7) xor r_v(11)) ror 12;
-            when 4 =>  
-              r_v(0) <= r_v(0) + r_v(4) + r_mblock(63 downto 32);
-              r_v(1) <= r_v(1) + r_v(5) + r_mblock(127 downto 96);
-              r_v(2) <= r_v(2) + r_v(6) + r_mblock(191 downto 160);
-              r_v(3) <= r_v(3) + r_v(7) + r_mblock(255 downto 224);
-            when 5 =>  
-              r_v(12) <= (r_v(12) xor r_v(0)) ror 8;
-              r_v(13) <= (r_v(13) xor r_v(1)) ror 8;
-              r_v(14) <= (r_v(14) xor r_v(2)) ror 8;
-              r_v(15) <= (r_v(15) xor r_v(3)) ror 8;
-            when 7 =>
-              r_v(4) <= (r_v(4) xor r_v(8))  ror 7;
-              r_v(5) <= (r_v(5) xor r_v(9))  ror 7;
-              r_v(6) <= (r_v(6) xor r_v(10)) ror 7;
-              r_v(7) <= (r_v(7) xor r_v(11)) ror 7;
-              -- Done, move to diagonals
-              r_state <= STATE_GDIAG;
-            when others => null;
-          end case;    
-          r_gops <= r_gops + 1;
-          if r_gops = 7 then
-            r_gops <= 0;
-          end if;                      
+          -- Each quarter-round in parallel
+          r_v(0)  <= f_A2(0, 4, 8,  12, 1);
+          r_v(1)  <= f_A2(1, 5, 9,  13, 3);
+          r_v(2)  <= f_A2(2, 6, 10, 14, 5);
+          r_v(3)  <= f_A2(3, 7, 11, 15, 7);
+          
+          r_v(12) <= f_D2(0, 4, 8,  12, 1);
+          r_v(13) <= f_D2(1, 5, 9,  13, 3);
+          r_v(14) <= f_D2(2, 6, 10, 14, 5);
+          r_v(15) <= f_D2(3, 7, 11, 15, 7);
+          
+          r_v(8)  <= f_C2(0, 4, 8,  12, 1);
+          r_v(9)  <= f_C2(1, 5, 9,  13, 3);
+          r_v(10) <= f_C2(2, 6, 10, 14, 5);
+          r_v(11) <= f_C2(3, 7, 11, 15, 7);
+          
+          r_v(4)  <= f_B2(0, 4, 8,  12, 1);
+          r_v(5)  <= f_B2(1, 5, 9,  13, 3);
+          r_v(6)  <= f_B2(2, 6, 10, 14, 5);
+          r_v(7)  <= f_B2(3, 7, 11, 15, 7);
+                   
+          -- Done, move to diagonals
+          r_state <= STATE_GDIAG;  
+          -- Buffer message block for next cycle
+          r_mblock_buf <= r_mblock;              
           
         when STATE_GDIAG =>
           -- Perform quarter-rounds on diagonals
-          -- Each quater-round in parallel, 8 operations each
-          case r_gops is
-            when 0 =>
-              r_v(0) <= r_v(0) + r_v(5) + r_mblock(287 downto 256);
-              r_v(1) <= r_v(1) + r_v(6) + r_mblock(351 downto 320);
-              r_v(2) <= r_v(2) + r_v(7) + r_mblock(415 downto 384);
-              r_v(3) <= r_v(3) + r_v(4) + r_mblock(479 downto 448);
-            when 1 =>
-              r_v(15) <= (r_v(15) xor r_v(0)) ror 16;
-              r_v(12) <= (r_v(12) xor r_v(1)) ror 16;
-              r_v(13) <= (r_v(13) xor r_v(2)) ror 16;
-              r_v(14) <= (r_v(14) xor r_v(3)) ror 16;
-            when 2 | 6 =>  
-              r_v(10) <= r_v(10) + r_v(15);
-              r_v(11) <= r_v(11) + r_v(12);
-              r_v(8)  <= r_v(8)  + r_v(13);
-              r_v(9)  <= r_v(9)  + r_v(14);
-            when 3 =>  
-              r_v(5) <= (r_v(5) xor r_v(10)) ror 12;
-              r_v(6) <= (r_v(6) xor r_v(11)) ror 12;
-              r_v(7) <= (r_v(7) xor r_v(8))  ror 12;
-              r_v(4) <= (r_v(4) xor r_v(9))  ror 12;
-            when 4 =>  
-              r_v(0) <= r_v(0) + r_v(5) + r_mblock(319 downto 288);
-              r_v(1) <= r_v(1) + r_v(6) + r_mblock(383 downto 352);
-              r_v(2) <= r_v(2) + r_v(7) + r_mblock(447 downto 416);
-              r_v(3) <= r_v(3) + r_v(4) + r_mblock(511 downto 480);
-            when 5 =>  
-              r_v(15) <= (r_v(15) xor r_v(0)) ror 8;
-              r_v(12) <= (r_v(12) xor r_v(1)) ror 8;
-              r_v(13) <= (r_v(13) xor r_v(2)) ror 8;
-              r_v(14) <= (r_v(14) xor r_v(3)) ror 8;
-              
-              -- Buffer message block for next cycle
-              r_mblock_buf <= r_mblock;
-            when 7 =>
-              r_v(5) <= (r_v(5) xor r_v(10))  ror 7;
-              r_v(6) <= (r_v(6) xor r_v(11))  ror 7;
-              r_v(7) <= (r_v(7) xor r_v(8)) ror 7;
-              r_v(4) <= (r_v(4) xor r_v(9)) ror 7;
-              -- Done, end of round
-              r_round <= r_round + 1;
-              -- Start new round or move to next state
-              if r_round = 6 then
-                r_round <= 0;
-                r_state <= STATE_OUTPUT;
-              else
-                -- Permutate mesg key schedule
-                for ii in 1 to 16 loop
-                  r_mblock((ii*32)-1 downto (ii-1)*32) <= r_mblock_buf((c_SCHEDULE(ii-1)+1)*32-1 downto c_SCHEDULE(ii-1)*32);
-                end loop;
-               
-                r_state <= STATE_GCOL;
-              end if;
-            when others => null;
-          end case;    
-          r_gops <= r_gops + 1;
-          if r_gops = 7 then
-            r_gops <= 0;
-          end if;  
+          -- Each quater-round in parallel      
+          r_v(0)  <= f_A2(0, 5, 10, 15, 9);
+          r_v(1)  <= f_A2(1, 6, 11, 12, 11);
+          r_v(2)  <= f_A2(2, 7, 8,  13, 13);
+          r_v(3)  <= f_A2(3, 4, 9,  14, 15);
+          
+          r_v(15) <= f_D2(0, 5, 10, 15, 9);
+          r_v(12) <= f_D2(1, 6, 11, 12, 11);
+          r_v(13) <= f_D2(2, 7, 8,  13, 13);
+          r_v(14) <= f_D2(3, 4, 9,  14, 15);
+          
+          r_v(10) <= f_C2(0, 5, 10, 15, 9);
+          r_v(11) <= f_C2(1, 6, 11, 12, 11);
+          r_v(8)  <= f_C2(2, 7, 8,  13, 13);
+          r_v(9)  <= f_C2(3, 4, 9,  14, 15);
+          
+          r_v(5) <= f_B2(0, 5, 10, 15, 9);
+          r_v(6) <= f_B2(1, 6, 11, 12, 11);
+          r_v(7) <= f_B2(2, 7, 8,  13, 13);
+          r_v(4) <= f_B2(3, 4, 9,  14, 15);
+          
+          -- Done, end of round
+          r_round <= r_round + 1;
+          -- Start new round or move to next state
+          if r_round = 6 then
+            r_round <= 0;
+            r_state <= STATE_OUTPUT;
+          else
+            -- Permutate mesg key schedule
+            for ii in 1 to 16 loop
+              r_mblock((ii*32)-1 downto (ii-1)*32) <= r_mblock_buf((c_SCHEDULE(ii-1)+1)*32-1 downto c_SCHEDULE(ii-1)*32);
+            end loop;
+            -- New round
+            r_state <= STATE_GCOL;
+          end if;
                     
       when STATE_OUTPUT =>
         for ii in 1 to 8 loop
