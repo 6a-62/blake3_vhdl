@@ -7,8 +7,8 @@ Includes an AXI4-Lite peripheral and an AXI4-Stream peripheral intended for DMA 
 
 ## Contents
 * [`blake3.vhd`](blake3.vhd) implements the BLAKE3 Compression Function.
-* [`axil_blake3.vhd`](axi_blake3.vhd) implements an AXI4-Lite slave peripheral.
-* [`axis_blake3.vhd`](axi_blake3.vhd) implements an AXI4-Stream peripheral.
+* [`axil_blake3.vhd`](axil_blake3.vhd) implements an AXI4-Lite slave peripheral.
+* [`axis_blake3.vhd`](axis_blake3.vhd) implements an AXI4-Stream peripheral.
 * Testbenches are provide to validate basic functionality, intended for use with Xilinx Vivado and may require adaptation for other VHDL simulators.
 
 All contents are licensed under the [3-Clause BSD license](LICENSE).
