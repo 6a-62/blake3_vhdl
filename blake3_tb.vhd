@@ -36,7 +36,7 @@ architecture behav of blake3_tb is
   signal w_reset  : std_logic := '0';
   
   -- For standard hash mode, initial chain values are the IV constants
-  signal r_chain  : unsigned(255 downto 0) := (
+  constant c_CHAIN  : unsigned(255 downto 0) := (
     x"5be0cd19" &
     x"1f83d9ab" &
     x"9b05688c" &
@@ -48,16 +48,16 @@ architecture behav of blake3_tb is
   );
   -- "Hello World!"
   -- Little Endian
-  signal r_mblock : unsigned(511 downto 0) := (
+  constant c_MBLOCK : unsigned(511 downto 0) := (
     to_unsigned(0,12*32) &
     x"0000000a" &
     x"21646c72" &
     x"6f57206f" &
     x"6c6c6548"
   );
-  signal r_numbytes : unsigned(31 downto 0) := to_unsigned(13,32);
-  signal r_counter  : unsigned(63 downto 0) := to_unsigned(0,64);
-  signal r_dflags   : unsigned(31 downto 0) := (
+  constant c_NUMBYTES : unsigned(31 downto 0) := to_unsigned(13,32);
+  constant c_COUNTER  : unsigned(63 downto 0) := to_unsigned(0,64);
+  constant c_DFLAGS   : unsigned(31 downto 0) := (
     0 => '1',
     1 => '1',
     3 => '1',
@@ -122,11 +122,11 @@ begin
     port map (
       i_clk       => w_clk,
       i_reset     => w_reset,
-      i_chain     => r_chain,
-      i_mblock    => r_mblock,
-      i_counter   => r_counter,
-      i_numbytes  => r_numbytes,
-      i_dflags    => r_dflags,
+      i_chain     => c_CHAIN,
+      i_mblock    => c_MBLOCK,
+      i_counter   => c_COUNTER,
+      i_numbytes  => c_NUMBYTES,
+      i_dflags    => c_DFLAGS,
       i_valid     => r_i_valid,
       o_hash      => r_hash,
       o_valid     => r_o_valid
