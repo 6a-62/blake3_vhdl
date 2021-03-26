@@ -13,30 +13,30 @@ entity axil_blake3 is
   );
   port (
     -- Clock and Reset
-    S_AXI_ACLK      : in  std_logic;
-    S_AXI_ARESETN   : in  std_logic;
+    s_axi_aclk      : in  std_logic;
+    s_axi_aresetn   : in  std_logic;
     -- Write Address Channel
-    S_AXI_AWADDR    : in  std_logic_vector(C_S_AXI_ADDR_WIDTH-1 downto 0);
-    S_AXI_AWVALID   : in  std_logic;
-    S_AXI_AWREADY   : out std_logic;
+    s_axi_awaddr    : in  std_logic_vector(C_S_AXI_ADDR_WIDTH-1 downto 0);
+    s_axi_awvalid   : in  std_logic;
+    s_axi_awready   : out std_logic;
     -- Write Data Channel
-    S_AXI_WDATA     : in  std_logic_vector(C_S_AXI_DATA_WIDTH-1 downto 0);
-    S_AXI_WSTRB     : in  std_logic_vector((C_S_AXI_DATA_WIDTH/8)-1 downto 0);
-    S_AXI_WVALID    : in  std_logic;
-    S_AXI_WREADY    : out std_logic;
+    s_axi_wdata     : in  std_logic_vector(C_S_AXI_DATA_WIDTH-1 downto 0);
+    s_axi_wstrb     : in  std_logic_vector((C_S_AXI_DATA_WIDTH/8)-1 downto 0);
+    s_axi_wvalid    : in  std_logic;
+    s_axi_wready    : out std_logic;
     -- Read Address Channel
-    S_AXI_ARADDR    : in std_logic_vector(C_S_AXI_ADDR_WIDTH-1 downto 0);
-    S_AXI_ARVALID   : in std_logic;
-    S_AXI_ARREADY   : out  std_logic;
+    s_axi_araddr    : in std_logic_vector(C_S_AXI_ADDR_WIDTH-1 downto 0);
+    s_axi_arvalid   : in std_logic;
+    s_axi_arready   : out  std_logic;
     -- Read Data Channel
-    S_AXI_RDATA     : out std_logic_vector(C_S_AXI_DATA_WIDTH-1 downto 0);
-    S_AXI_RRESP     : out std_logic_vector(1 downto 0);
-    S_AXI_RVALID    : out std_logic;
-    S_AXI_RREADY    : in  std_logic;
+    s_axi_rdata     : out std_logic_vector(C_S_AXI_DATA_WIDTH-1 downto 0);
+    s_axi_rresp     : out std_logic_vector(1 downto 0);
+    s_axi_rvalid    : out std_logic;
+    s_axi_rready    : in  std_logic;
     -- Write Response Channel
-    S_AXI_BRESP     : out std_logic_vector(1 downto 0);
-    S_AXI_BVALID    : out std_logic;
-    S_AXI_BREADY    : in  std_logic
+    s_axi_bresp     : out std_logic_vector(1 downto 0);
+    s_axi_bvalid    : out std_logic;
+    s_axi_bready    : in  std_logic
   );
 end axil_blake3;
 
@@ -94,7 +94,7 @@ architecture behav of axil_blake3 is
   impure function f_APPLY_WSTRB (
     r_IN : in std_logic_vector(C_S_AXI_DATA_WIDTH-1 downto 0))
     return unsigned is
-    variable v_TEMP : std_logic_vector(C_S_AXI_DATA_WIDTH-1 downto 0) := (others => '0');
+    variable v_temp : std_logic_vector(C_S_AXI_DATA_WIDTH-1 downto 0) := (others => '0');
   begin
     for ii in 0 to ((C_S_AXI_DATA_WIDTH)/8-1) loop
       if ( S_AXI_WSTRB(ii) = '1' ) then
@@ -118,13 +118,10 @@ begin
   S_AXI_BRESP   <= "00"; -- Always respond OKAY
   S_AXI_BVALID  <= r_bvalid;
 
-  -- Take AXI Reset signal from active low to active high
-  w_reset <= not S_AXI_ARESETN;
-
   -- BLAKE3 Compression Entity
   e_blake3 : blake3 port map (
     i_clk => S_AXI_ACLK,
-    i_reset     => w_reset, 
+    i_reset     => S_AXI_ARESETN, 
     i_chain     => r_chain,     --x00 to x1F
     i_mblock    => r_mblock,    --x20 to x5F
     i_counter   => r_counter,   --x60 to x67
@@ -136,27 +133,27 @@ begin
   );
   
   -- Write Ready signals
-  process (S_AXI_ACLK)
+  process (s_axi_aclk)
   begin
-    if rising_edge(S_AXI_ACLK) then
-     if S_AXI_ARESETN = '0' then
+    if rising_edge(s_axi_aclk) then
+     if s_axi_aresetn = '0' then
         r_wready <= '0';
       else
         -- Ready to accept Write Address/Data when Valid signals are asserted.
         -- Only assert if low previous cycle, limits to every other cycle
         -- Check Write Response channel, if Ready was set while BVALID & !BREADY a response would be dropped
-        r_wready <= (not r_wready) and (S_AXI_AWVALID and S_AXI_WVALID) and ((not r_bvalid) or S_AXI_BREADY);
+        r_wready <= (not r_wready) and (s_axi_awvalid and s_axi_wvalid) and ((not r_bvalid) or s_axi_bready);
       end if;
     end if;
   end process;
   
   -- Write Logic
-  process (S_AXI_ACLK)
+  process (s_axi_aclk)
     variable v_addr   : integer;
     variable v_offset : integer;
   begin
-    if rising_edge(S_AXI_ACLK) then
-      if S_AXI_ARESETN = '0' then
+    if rising_edge(s_axi_aclk) then
+      if s_axi_aresetn = '0' then
         -- Clear registers on reset
         r_chain     <= (others => '0');
         r_mblock    <= (others => '0');  
@@ -166,7 +163,7 @@ begin
         r_i_valid   <= '0'; 
         
       elsif r_wready='1' then
-        v_addr  := to_integer(unsigned(S_AXI_AWADDR(C_S_AXI_ADDR_WIDTH-1 downto c_LSB)));
+        v_addr  := to_integer(unsigned(s_axi_awaddr(C_S_AXI_ADDR_WIDTH-1 downto c_LSB)));
         case v_addr is     
           when 0 to 8-(C_S_AXI_DATA_WIDTH/32) =>
             v_offset := ((v_addr-0)*C_S_AXI_DATA_WIDTH);
@@ -189,61 +186,61 @@ begin
     end if;
   end process;
  
-  -- Write Respond Signal
-  process (S_AXI_ACLK)
+  -- write respond signal
+  process (s_axi_aclk)
   begin  
-    if rising_edge(S_AXI_ACLK) then
-      if S_AXI_ARESETN='0' then
+    if rising_edge(s_axi_aclk) then
+      if s_axi_aresetn='0' then
         r_bvalid <= '0';
       elsif r_wready='1' then
         r_bvalid <= '1';
-      elsif S_AXI_BREADY='1' then
+      elsif s_axi_bready='1' then
         r_bvalid <= '0';
       end if;
     end if;
   end process;
   
-  -- Read Write Address Ready Signa
-  process (S_AXI_ACLK)
+  -- read write address ready signa
+  process (s_axi_aclk)
   begin  
-    if rising_edge(S_AXI_ACLK) then
-      if S_AXI_ARESETN='0' then
+    if rising_edge(s_axi_aclk) then
+      if s_axi_aresetn='0' then
         r_rready <= '0';
       else
-        -- If not Valid Read Data, assert Address Ready for new read
+        -- if not valid read data, assert address ready for new read
         r_rready <= not r_rvalid;
       end if;
     end if;
   end process;
   
-  -- Read Data Valid Signal
-  process (S_AXI_ACLK)
+  -- read data valid signal
+  process (s_axi_aclk)
   begin  
-    if rising_edge(S_AXI_ACLK) then
-      if S_AXI_ARESETN='0' then
+    if rising_edge(s_axi_aclk) then
+      if s_axi_aresetn='0' then
         r_rvalid <= '0';
-      elsif (S_AXI_ARVALID and r_rready)='1' then
-        -- If Read Address is Valid & Ready, assert Data Ready
+      elsif (s_axi_arvalid and r_rready)='1' then
+        -- if read address is valid & ready, assert data ready
         r_rvalid <= '1';
-      elsif S_AXI_RREADY='1' then
+      elsif s_axi_rready='1' then
         r_rvalid <= '0';
       end if;
     end if;
   end process;
   
   
-  -- Read Logic
-  process (S_AXI_ACLK)
+  -- read logic
+  process (s_axi_aclk)
     variable v_addr   : integer;
     variable v_offset : integer;
   begin  
-    if rising_edge(S_AXI_ACLK) then
-      if S_AXI_ARESETN='0' then
+    if rising_edge(s_axi_aclk) then
+      if s_axi_aresetn='0' then
         r_rdata <= (others => '0');
         
-      elsif ((not r_rvalid) or S_AXI_RREADY)='1' then
+      elsif ((not r_rvalid) or s_axi_rready)='1' then
         -- Write to Data Bus whenever allowed
-        v_addr  := to_integer(unsigned(S_AXI_ARADDR(C_S_AXI_ADDR_WIDTH-1 downto c_LSB)));
+        v_addr  := to_integer(unsigned(s_axi_araddr(C_S_AXI_ADDR_WIDTH-1 downto c_LSB)));
         case v_addr is
           when 29 to 46-(C_S_AXI_DATA_WIDTH/32) =>
             v_offset := ((v_addr-29)*C_S_AXI_DATA_WIDTH);
