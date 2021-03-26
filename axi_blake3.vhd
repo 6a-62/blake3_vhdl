@@ -125,14 +125,14 @@ begin
   e_blake3 : blake3 port map (
     i_clk => S_AXI_ACLK,
     i_reset     => w_reset, 
-    i_chain     => r_chain,     --BASE + x00 to x1C
-    i_mblock    => r_mblock,    --BASE + x20 to x5C
-    i_counter   => r_counter,   --BASE + x60 to x64
-    i_numbytes  => r_numbytes,  --BASE + x68
-    i_dflags    => r_dflags,    --BASE + x6C
-    i_valid     => r_i_valid,   --BASE + x70
-    o_hash      => r_hash,      --BASE + x74 to xB4
-    o_valid     => r_o_valid    --BASE + xB8
+    i_chain     => r_chain,     --x00 to x1F
+    i_mblock    => r_mblock,    --x20 to x5F
+    i_counter   => r_counter,   --x60 to x67
+    i_numbytes  => r_numbytes,  --x68 to x6B
+    i_dflags    => r_dflags,    --x6C to 6F
+    i_valid     => r_i_valid,   --x70 to 0x73
+    o_hash      => r_hash,      --x74 to xB7
+    o_valid     => r_o_valid    --xB8 to 0xBB
   );
   
   -- Write Ready signals
