@@ -3,7 +3,7 @@ use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 use ieee.math_real.all;
 
-entity axi_blake3 is
+entity axil_blake3 is
   generic (
     -- AXI Parameters
     -- Could support 64bit data width on a full AXI4 core
@@ -38,9 +38,9 @@ entity axi_blake3 is
     S_AXI_BVALID    : out std_logic;
     S_AXI_BREADY    : in  std_logic
   );
-end axi_blake3;
+end axil_blake3;
 
-architecture behav of axi_blake3 is
+architecture behav of axil_blake3 is
   component blake3 is
     port (
       -- Clock
