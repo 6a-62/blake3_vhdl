@@ -33,7 +33,7 @@ architecture behav of blake3_tb is
   end component;
   
   signal w_clk    : std_logic := '0';
-  signal w_reset  : std_logic := '1';
+  signal w_reset  : std_logic := '0';
   
   -- For standard hash mode, initial chain values are the IV constants
   signal r_chain  : unsigned(255 downto 0) := (
@@ -115,7 +115,7 @@ begin
     end if;
   end process;
   
-  w_reset <= '1', '0' after c_PERIOD;
+  w_reset <= '0', '1' after c_PERIOD;
   r_i_valid <= '1' after c_PERIOD*2; 
   
   dut : blake3
