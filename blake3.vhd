@@ -166,7 +166,7 @@ begin
   begin
     if i_reset = '0' then
       r_state <= STATE_IDLE;
-      o_valid <= '0';
+      o_valid <= '1';
       o_hash <= (others => '0');
       
     elsif rising_edge(i_clk) then
