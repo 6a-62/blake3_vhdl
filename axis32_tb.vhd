@@ -162,6 +162,9 @@ begin
     s_axis_tlast  <= '0';
     s_axis_tvalid <= '0';
     
+    s_axis_tvalid <= '1';
+    wait for c_PERIOD*5;
+    s_axis_tvalid <= '0';
     wait for c_PERIOD*50;
     wait;
   end process;
